@@ -22,22 +22,99 @@
 
 ---
 
-## 핵심 구현 컨텐츠 및 아키텍처
+## 아키텍처
+
+<img width="1087" height="856" alt="image" src="https://github.com/user-attachments/assets/fe576745-9cce-4d0d-932f-7029a68118da" />
+
+---
+
+## 핵심 구현 컨텐츠
 
 ### 1. TPS 플레이어 로코모션 & 무기별 애니메이션 오버라이드
 - **BlendSpace & AimOffset**: 이동 방향, 속도 및 시선 처리를 위한 조준 앵글 로직을 구현했습니다.
 - **런타임 애니메이션 오버라이드**: 무기 종류(권총, 소총, 근접 무기 등)에 따라 적절한 애니메이션이 재생되도록 `AnimInstance` 가 데이터테이블을 캐싱하여 간편한 애니메이션 오버라이드 구조를 설계했습니다.
 - **신체 부위에 따른 애니메이션 블렌딩**: 무기 종류(권총, 소총, 근접 무기 등)에 따라 상체 애니메이션이 유연하게 전환되도록 `AnimInstance` 내 Layered blend per bone 및 Animation Montage 오버라이드 구조를 설계했습니다.
 
-<img width="887" height="377" alt="데이터테이블&애님인스턴스" src="https://github.com/user-attachments/assets/2540bf9c-164b-48ec-876a-57641949a9b5" />
+![override](/pics/override.gif)
+
+다음은 주요 코드 요약 (플레이어 애님인스턴스) 입니다.
+
+> AWeekPlayerAnimInstance.cpp
+
+```c++
+void UAWeekPlayerAnimInstance::NativeBeginPlay()
+{
+	Super::NativeBeginPlay();
+
+	mOwner = Cast<AAWeekPlayerCharacter>(GetOwningActor());
+
+	if (!AnimInfoDT) return;
+
+	TMap<FName, uint8*> RowMap = AnimInfoDT->GetRowMap();
+	for (auto& Row : RowMap)
+	{
+		FName RowKey = Row.Key;
+		FPlayerAnimInfo* RowData = reinterpret_cast<FPlayerAnimInfo*>(Row.Value);
+
+		if (RowData)
+		{
+			mAnimMap.Add(RowKey, *RowData);
+		}
+	}
+	ChangeAnimOverride(mStatusKey);
+	OnMontageEnded.AddDynamic(this, &UAWeekPlayerAnimInstance::MontageEnd);
+}
+```
+
 
 <br>
 
 ### 2. `Motion Warping` 기반 파쿠르 시스템
 - **Trace 기반 지형 탐지**: Line/Capsule Trace를 사용해 장애물의 높이, 두께, 벽면 법선(Normal)을 실시간으로 산출했습니다.
 - **Motion Warping Plugin 활용**: 계산된 지점(Vault Point, Climb Point)에 플레이어 몽타주 루트 모션을 정확히 동기화하여 자연스러운 장애물 넘기 및 벽 오르기 동작을 구현했습니다.
-  
-<img width="359" height="279" alt="image" src="https://github.com/user-attachments/assets/06d2511b-a518-49f2-b059-10dcc0dc9a0e" />
+
+![vault](/pics/vault.gif)
+
+다음은 주요 코드 요약 (볼트 액션) 입니다.
+
+> AWeekPakourComponent.cpp
+
+```c++
+bool UAWeekPakourComponent::TryVault()
+{
+	float GroundHeight = mOwner->GetMesh()->GetComponentLocation().Z;
+	float WallHeight = mFirstWallHit.Location.Z - GroundHeight;
+
+	if (WallHeight > 30 && WallHeight < 110)
+	{
+		SetVaultMotionWarping();
+		mOwner->VaultStart();
+		return true;
+	}
+
+	return false;
+}
+
+void UAWeekPakourComponent::SetVaultMotionWarping()
+{
+	FVector Start = mFirstTopHit.Location;
+	Start.Z -= 70;
+	FVector End = mVaultLandHit.Location;
+
+	mOwnerMWC->AddOrUpdateWarpTargetFromLocationAndRotation(
+		FName("VaultStart"),
+		Start,
+		mWallRotation.Rotation()
+	);
+
+	mOwnerMWC->AddOrUpdateWarpTargetFromLocationAndRotation(
+		FName("VaultEnd"),
+		End,
+		mWallRotation.Rotation()
+	);
+}
+```
+
 
 <br>
 
@@ -90,18 +167,34 @@ void AAWeekPlayerCharacter::Tick(float DeltaTime)
 }
 ```
 
+<br>
+
+### 4. 기타 핵심 구현 컨텐츠
+- **UMG 애니메이션** 을 활용하여 가시성이 뛰어난 UI를 디자인했습니다.
+
+![stamina](/pics/stamina.gif)
+
+- **Niagara VFX** 를 활용하여 플레이어 발자국, 총구 머즐 플레어 이펙트를 구현했습니다.
+- 월드맵의 Directional Light를 참조하여 실시간 조도를 변경하여 낮과 밤 시스템을 구축했습니다.
+
 ---
 
 ## 트러블슈팅
 
 ### 1. 총기 프레임/Notify 의존성으로 인한 연사 속도 오류
-- **문제**: 애니메이션 몽타주의 AnimNotify에 격발 로직을 바인딩해 두었으나, 프레임 드랍이나 몽타주 재생 속도 조절 시 실제 프레임에 맞춰 연사 속도가 비정상적으로 빨라지거나 느려지는 현상이 발생했습니다. [YouTube 문제 상황 1](https://www.youtube.com/watch?v=-_sebh7_O0Q)
+- **문제**: 애니메이션 몽타주의 AnimNotify에 격발 로직을 바인딩해 두었으나, 프레임 드랍이나 몽타주 재생 속도 조절 시 실제 프레임에 맞춰 연사 속도가 비정상적으로 빨라지는 현상이 발생했습니다.
+
+![trouble1](/pics/trouble1.gif)
+
 - **해결**:
   - 무기 데이터(DataTable)에 `FireRate` 항목을 추가하고, `TickComponent` 내에서 DeltaTime 누적 수치(`mTimeSinceLastShot`)를 계산하는 타이머 기반 로직으로 전환했습니다.
   - 애니메이션 재생 타이밍과 실제 격발 타이밍을 분리하여 안정적인 사격 주기를 확보했습니다.
 
 ### 2. 높이가 다른 벽 오르기 시 Motion Warping 위치 어긋남
-- **문제**: Motion Warping으로 착지/잡기 지점을 지정했으나, 장애물 높이에 따라 캡슐 콜리전과 벽 상단의 연산 지점이 달라지면서 파쿠르 종료 후 플레이어가 공중에 뜨거나 벽 내부로 파묻히는 문제가 있었습니다. [YouTube 문제 상황 2](https://www.youtube.com/watch?v=SwFqHIYX0_8)
+- **문제**: Motion Warping으로 착지/잡기 지점을 지정했으나, 장애물 높이에 따라 캡슐 콜리전과 벽 상단의 연산 지점이 달라지면서 파쿠르 종료 후 플레이어가 공중에 뜨거나 벽 내부로 파묻히는 문제가 있었습니다.
+
+![trouble2](/pics/trouble2.gif)
+
 - **해결**:
   - Trace로 측정한 실제 벽 높이 오프셋(`mWallHeight`)을 계산하여, 파쿠르 시작 시 플레이어의 캡슐 콜리전 위치와 이동 모드(`MOVE_Flying`)를 수동으로 1차 보정한 뒤 Motion Warping을 수행하도록 수정했습니다.
 
