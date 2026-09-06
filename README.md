@@ -15,6 +15,13 @@
 
 ---
 
+## 게임 소개
+- 낮과 밤이라는 시간대를 설정하여 낮에는 수집 및 제작, 밤에는 생존, 슈팅으로 장르가 변하는 게임입니다.
+- 무기 뿐 아니라 식량과 포탑 등 다양한 아이템을 제작하고 사용할 수 있도록 제작했습니다.
+- 좀비는 시야와 소리 모두 탐지가 가능하고, 밤에는 탐지 범위가 더 증폭되어 긴장감 넘치는 게임플레이 경험을 주도록 설계했습니다.
+
+---
+
 ## 핵심 구현 컨텐츠 및 아키텍처
 
 ### 1. TPS 플레이어 로코모션 & 무기별 애니메이션 오버라이드
@@ -24,12 +31,15 @@
 
 <img width="887" height="377" alt="데이터테이블&애님인스턴스" src="https://github.com/user-attachments/assets/2540bf9c-164b-48ec-876a-57641949a9b5" />
 
+<br>
+
 ### 2. `Motion Warping` 기반 파쿠르 시스템
 - **Trace 기반 지형 탐지**: Line/Capsule Trace를 사용해 장애물의 높이, 두께, 벽면 법선(Normal)을 실시간으로 산출했습니다.
 - **Motion Warping Plugin 활용**: 계산된 지점(Vault Point, Climb Point)에 플레이어 몽타주 루트 모션을 정확히 동기화하여 자연스러운 장애물 넘기 및 벽 오르기 동작을 구현했습니다.
   
 <img width="359" height="279" alt="image" src="https://github.com/user-attachments/assets/06d2511b-a518-49f2-b059-10dcc0dc9a0e" />
 
+<br>
 
 ### 3. `UGameEventMessageSubsystem` 기반 HUD 및 UMG UI
 - **객체와 UI간의 의존성 최소화**: 플레이어 캐릭터나 스태미너/체력 컴포넌트가 UI 클래스를 직접 참조하지 않도록 옵저버 패턴을 활용했습니다.
