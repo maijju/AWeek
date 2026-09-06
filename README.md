@@ -35,8 +35,6 @@
 - **런타임 애니메이션 오버라이드**: 무기 종류(권총, 소총, 근접 무기 등)에 따라 적절한 애니메이션이 재생되도록 `AnimInstance` 가 데이터테이블을 캐싱하여 간편한 애니메이션 오버라이드 구조를 설계했습니다.
 - **신체 부위에 따른 애니메이션 블렌딩**: 무기 종류(권총, 소총, 근접 무기 등)에 따라 상체 애니메이션이 유연하게 전환되도록 `AnimInstance` 내 Layered blend per bone 및 Animation Montage 오버라이드 구조를 설계했습니다.
 
-![override](/pics/override.gif)
-
 다음은 주요 코드 요약 (플레이어 애님인스턴스) 입니다.
 
 > AWeekPlayerAnimInstance.cpp
@@ -66,14 +64,13 @@ void UAWeekPlayerAnimInstance::NativeBeginPlay()
 }
 ```
 
+![override](/pics/override.gif)
 
 <br>
 
 ### 2. `Motion Warping` 기반 파쿠르 시스템
 - **Trace 기반 지형 탐지**: Line/Capsule Trace를 사용해 장애물의 높이, 두께, 벽면 법선(Normal)을 실시간으로 산출했습니다.
 - **Motion Warping Plugin 활용**: 계산된 지점(Vault Point, Climb Point)에 플레이어 몽타주 루트 모션을 정확히 동기화하여 자연스러운 장애물 넘기 및 벽 오르기 동작을 구현했습니다.
-
-![vault](/pics/vault.gif)
 
 다음은 주요 코드 요약 (볼트 액션) 입니다.
 
@@ -115,6 +112,7 @@ void UAWeekPakourComponent::SetVaultMotionWarping()
 }
 ```
 
+![vault](/pics/vault.gif)
 
 <br>
 
